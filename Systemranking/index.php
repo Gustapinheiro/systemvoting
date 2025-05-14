@@ -12,39 +12,15 @@ try {
     die("Conexão falhou: " . $e->getMessage());
 }
 
-// Criação das tabelas se não existirem
-$conn->exec("
-    CREATE TABLE IF NOT EXISTS Options (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        votes INT DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS Votes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        option_id INT,
-        user_ip VARCHAR(45),
-        vote_time DATETIME,
-        FOREIGN KEY (option_id) REFERENCES options(id)
-    );
-");
-
 // Inserir opções iniciais se não houver nenhuma
 $stmt = $conn->query("SELECT COUNT(*) FROM Options");
 if ($stmt->fetchColumn() == 0) {
     $conn->exec("
         INSERT INTO Options (name, votes) VALUES 
         ('Sala 1', 0),
-        ('Sala 2 ', 0),
+        ('Sala 2', 0),
         ('Sala 3', 0)
     ");
-}
-
-// Função para evitar votação duplicada pelo mesmo IP
-function hasVoted($conn, $ip) {
-    $stmt = $conn->prepare("SELECT COUNT(*) FROM votes WHERE user_ip = ?");
-    $stmt->execute([$ip]);
-    return $stmt->fetchColumn() > 0;
 }
 
 // Processar voto
@@ -53,17 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['option_id'])) {
     $option_id = filter_input(INPUT_POST, 'option_id', FILTER_VALIDATE_INT);
     $user_ip = $_SERVER['REMOTE_ADDR'];
 
-    if ($option_id && !hasVoted($conn, $user_ip)) {
+    if ($option_id) {
         try {
             // Iniciar transação
             $conn->beginTransaction();
             
             // Registrar voto
-            $stmt = $conn->prepare("INSERT INTO votes (option_id, user_ip, vote_time) VALUES (?, ?, NOW())");
+            $stmt = $conn->prepare("INSERT INTO Votes (option_id, user_ip, vote_time) VALUES (?, ?, NOW())");
             $stmt->execute([$option_id, $user_ip]);
             
             // Incrementar contagem de votos
-            $stmt = $conn->prepare("UPDATE options SET votes = votes + 1 WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE Options SET votes = votes + 1 WHERE id = ?");
             $stmt->execute([$option_id]);
             
             $conn->commit();
@@ -73,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['option_id'])) {
             $message = "Erro ao registrar voto: " . $e->getMessage();
         }
     } else {
-        $message = "Você já votou ou a opção é inválida!";
+        $message = "Opção inválida!";
     }
 }
 ?>
@@ -102,26 +78,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['option_id'])) {
         </p>
     <?php endif; ?>
 
-    <?php if (!hasVoted($conn, $_SERVER['REMOTE_ADDR'])): ?>
-        <form method="POST">
-            <h2>Escolha uma opção:</h2>
-            <?php
-            $stmt = $conn->query("SELECT * FROM options");
-            while ($option = $stmt->fetch(PDO::FETCH_ASSOC)):
-            ?>
-                <div class="option">
-                    <input type="radio" name="option_id" value="<?php echo $option['id']; ?>" 
-                           id="option_<?php echo $option['id']; ?>" required>
-                    <label for="option_<?php echo $option['id']; ?>">
-                        <?php echo htmlspecialchars($option['name']); ?>
-                    </label>
-                </div>
-            <?php endwhile; ?>
-            <button type="submit">Votar</button>
-        </form>
-    <?php else: ?>
-        <p>Você já votou. Veja o ranking abaixo:</p>
-    <?php endif; ?>
+    <form method="POST">
+        <h2>Escolha uma opção:</h2>
+        <?php
+        $stmt = $conn->query("SELECT * FROM Options");
+        while ($option = $stmt->fetch(PDO::FETCH_ASSOC)):
+        ?>
+            <div class="option">
+                <input type="radio" name="option_id" value="<?php echo $option['id']; ?>" 
+                       id="option_<?php echo $option['id']; ?>" required>
+                <label for="option_<?php echo $option['id']; ?>">
+                    <?php echo htmlspecialchars($option['name']); ?>
+                </label>
+            </div>
+        <?php endwhile; ?>
+        <button type="submit">Votar</button>
+    </form>
 
     <div class="ranking">
         <h2>Ranking de Votos</h2>
@@ -133,10 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['option_id'])) {
                 <th>Porcentagem</th>
             </tr>
             <?php
-            $stmt = $conn->query("SELECT SUM(votes) as total_votes FROM options");
+            $stmt = $conn->query("SELECT SUM(votes) as total_votes FROM Options");
             $total_votes = $stmt->fetch(PDO::FETCH_ASSOC)['total_votes'] ?: 1;
             
-            $stmt = $conn->query("SELECT * FROM options ORDER BY votes DESC");
+            $stmt = $conn->query("SELECT * FROM Options ORDER BY votes DESC");
             $position = 1;
             while ($option = $stmt->fetch(PDO::FETCH_ASSOC)):
                 $percentage = ($option['votes'] / $total_votes) * 100;
