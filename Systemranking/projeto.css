@@ -1,0 +1,37 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+.projeto-container {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+.projeto {
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+}
+button {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #45a049;
+}
+
+.btn-votar{
+    margin-top: 24px;
+    margin: 0 auto;
+    display: block;
+    align-items: center;
+    justify-content: center;
+    
+}
